@@ -1,0 +1,7 @@
+﻿{
+  "access_token": "FAKEACESS",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "refresh_token": "FAKEREFRESH",
+  "api_server": "https://api01.iq.questrade.com" 
+}
