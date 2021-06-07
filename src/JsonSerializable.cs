@@ -20,10 +20,8 @@ namespace PollQT
 
         public override int GetHashCode() => ToJson().GetHashCode();
 
-        public override bool Equals(object? obj)
-        {
-            if (obj == null || GetType() != obj.GetType())
-            {
+        public override bool Equals(object? obj) {
+            if (obj == null || GetType() != obj.GetType()) {
                 return false;
             }
             var t = (JsonSerializable<T>)obj;

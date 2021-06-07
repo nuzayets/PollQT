@@ -1,4 +1,3 @@
-using System;
 using System.Text;
 using System.Text.Json;
 
@@ -20,30 +19,17 @@ namespace PollQT.Questrade.Responses
 
     internal class SnakeCaseNamingPolicy : JsonNamingPolicy
     {
-        public override string ConvertName(string name)
-        {
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
+        public override string ConvertName(string name) {
             var result = new StringBuilder();
-            for (var i = 0; i < name.Length; i++)
-            {
+            for (var i = 0; i < name.Length; i++) {
                 var c = name[i];
-                if (i == 0)
-                {
+                if (i == 0) {
                     result.Append(char.ToLower(c));
-                }
-                else
-                {
-                    if (char.IsUpper(c))
-                    {
+                } else {
+                    if (char.IsUpper(c)) {
                         result.Append('_');
                         result.Append(char.ToLower(c));
-                    }
-                    else
-                    {
+                    } else {
                         result.Append(c);
                     }
                 }

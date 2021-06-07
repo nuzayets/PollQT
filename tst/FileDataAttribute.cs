@@ -12,8 +12,7 @@ namespace PollQT.Questrade
 
         public FileDataAttribute(string filePath) : base() => this.filePath = filePath;
 
-        public override IEnumerable<object[]> GetData(MethodInfo testMethod)
-        {
+        public override IEnumerable<object[]> GetData(MethodInfo testMethod) {
             if (testMethod == null) { throw new ArgumentNullException(nameof(testMethod)); }
 
             // Get the absolute path to the file
@@ -21,8 +20,7 @@ namespace PollQT.Questrade
                 ? filePath
                 : Path.GetRelativePath(Directory.GetCurrentDirectory(), filePath);
 
-            if (!File.Exists(path))
-            {
+            if (!File.Exists(path)) {
                 throw new ArgumentException($"Could not find file at path: {path}");
             }
 

@@ -11,8 +11,7 @@ namespace PollQT.Questrade
         public int NextDelay => Math.Min(delayMilliseconds * (pow - 1) / 2, maxDelayMilliseconds);
 
         public ExponentialBackoff(int maxRetries, int delayMilliseconds,
-            int maxDelayMilliseconds)
-        {
+            int maxDelayMilliseconds) {
             this.maxRetries = maxRetries;
             this.delayMilliseconds = delayMilliseconds;
             this.maxDelayMilliseconds = maxDelayMilliseconds;
@@ -20,15 +19,12 @@ namespace PollQT.Questrade
             pow = 1;
         }
 
-        public Task Delay()
-        {
-            if (retries == maxRetries)
-            {
+        public Task Delay() {
+            if (retries == maxRetries) {
                 throw new TimeoutException("Max retry attempts exceeded.");
             }
             ++retries;
-            if (retries < 31)
-            {
+            if (retries < 31) {
                 pow <<= 1; // m_pow = Pow(2, m_retries - 1)
             }
             var delay = NextDelay;

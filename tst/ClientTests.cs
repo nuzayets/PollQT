@@ -1,5 +1,5 @@
-using PollQT.Questrade.Responses;
 using System.Text.RegularExpressions;
+using PollQT.Questrade.Responses;
 using Xunit;
 
 namespace PollQT.Questrade
@@ -8,8 +8,7 @@ namespace PollQT.Questrade
     {
         [Theory]
         [FileData("inputs/example-token.json")]
-        public void DeserializesExample(string json)
-        {
+        public void DeserializesExample(string json) {
             var t = Token.FromJson(json);
             Assert.NotNull(t.AccessToken);
             Assert.NotNull(t.ApiServer);
@@ -18,8 +17,7 @@ namespace PollQT.Questrade
 
         [Theory]
         [FileData("inputs/bootstrap-token.json")]
-        public void DeserializesBootstrap(string json)
-        {
+        public void DeserializesBootstrap(string json) {
             var t = Token.FromJson(json);
             Assert.Null(t.AccessToken);
             Assert.Null(t.ApiServer);
@@ -28,8 +26,7 @@ namespace PollQT.Questrade
 
         [Theory]
         [FileData("inputs/example-token.json")]
-        public void SerializeRoundTrip(string json)
-        {
+        public void SerializeRoundTrip(string json) {
             var t = Token.FromJson(json);
             var s = t.ToJson();
             var t2 = Token.FromJson(s);
@@ -38,8 +35,7 @@ namespace PollQT.Questrade
 
         [Theory]
         [FileData("inputs/example-token.json")]
-        public void SerializesNonEmpty(string json)
-        {
+        public void SerializesNonEmpty(string json) {
             var t = Token.FromJson(json);
             var s = Regex.Replace(t.ToJson(), @"\s+", "");
             Assert.NotEqual("{}", s);

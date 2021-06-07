@@ -11,8 +11,7 @@ namespace PollQT.DataTypes
         public List<AccountPosition> Positions { get; }
 
 
-        public PollResult(Account account, AccountBalance balance, List<AccountPosition> positions)
-        {
+        public PollResult(Account account, AccountBalance balance, List<AccountPosition> positions) {
             Timestamp = DateTime.UtcNow;
             Account = account;
             Balance = balance;

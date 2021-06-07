@@ -1,27 +1,52 @@
-﻿using PollQT.DataTypes;
-using PollQT.OutputSinks;
-using Serilog;
-using Serilog.Sinks.SystemConsole.Themes;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using PollQT.DataTypes;
+using PollQT.OutputSinks;
+using PollQT.Util;
+using Serilog;
+using Serilog.Core;
+using Serilog.Sinks.SystemConsole.Themes;
 
 namespace PollQT
 {
     internal class Program
     {
-        public static event EventHandler<PollResult>? RaisePollResults;
+        public static event EventHandler<List<PollResult>>? RaisePollResults;
 
-        private static void Main()
-        {
+        private static string ConfigureWorkingDirectory() {
+#if DEBUG
+            var workDirName = ".pollqt-dbg";
+#else
+            var workDirName = ".pollqt";
+#endif
+
             var workDir = Environment.GetEnvironmentVariable("POLLQT_WORKDIR") ??
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".pollqt");
+    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), workDirName);
 
-            using var log = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .WriteTo.Console(theme: AnsiConsoleTheme.Code)
-                .WriteTo.File(Path.Combine(workDir, "logs/pollqt.log"), rollingInterval: RollingInterval.Day)
+            return workDir;
+        }
+
+        private static Logger ConfigureLogger(string workDir) {
+#if DEBUG
+            var baseConfig = new LoggerConfiguration().MinimumLevel.Verbose();
+#else
+            var baseConfig = new LoggerConfiguration().MinimumLevel.Information();
+#endif
+            return baseConfig
+                .Enrich.WithThreadId()
+                .Enrich.WithUtcTimestamp()
+                .WriteTo.Console(theme: AnsiConsoleTheme.Code,
+                    outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}")
+                .WriteTo.Map("UtcTimestamp", DateTime.UtcNow,
+                    (UtcDateTime, wt) => wt.File(Path.Combine(workDir, $"logs/pollqt{UtcDateTime:yyyyMMdd}.log")))
                 .CreateLogger();
+        }
+
+        private static void Main() {
+            var workDir = ConfigureWorkingDirectory();
+            using var log = ConfigureLogger(workDir);
 
             var context = new Context(log, workDir);
             var client = new Questrade.Client(context);
@@ -29,19 +54,12 @@ namespace PollQT
             var fileWriter = new JsonLinesFileOutputSink(context);
             RaisePollResults += async (s, e) => await fileWriter.NewEvent(e);
 
-            while (true)
-            {
+            while (true) {
                 var pollResults = client.PollWithRetry().Result;
-                log.Debug("Got poll result: {@res}", pollResults);
-                foreach (var pollResult in pollResults)
-                {
-                    RaisePollResults(null, pollResult);
-                }
+                log.Verbose("Got poll result: {@res}", pollResults);
+                RaisePollResults(null, pollResults);
                 Thread.Sleep(60 * 1000);
             }
-
-
-
         }
     }
 }

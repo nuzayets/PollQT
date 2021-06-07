@@ -1,6 +1,6 @@
+using System.IO;
 using PollQT.Questrade.Responses;
 using Serilog;
-using System.IO;
 
 namespace PollQT.Questrade
 {
@@ -9,28 +9,22 @@ namespace PollQT.Questrade
         private readonly ILogger log;
         private readonly string filePath;
 
-        public FileTokenStore(ILogger log, string filePath)
-        {
-            this.log = log;
-            this.filePath = filePath;
+        public FileTokenStore(Context context) {
+            log = context.Logger.ForContext<FileTokenStore>();
+            filePath = Path.Combine(context.WorkDir, "token.json");
         }
 
-        public Token GetToken()
-        {
-            try
-            {
+        public Token GetToken() {
+            try {
                 log.Information("Reading token: {filePath}", filePath);
                 return Token.FromJson(File.ReadAllText(filePath));
-            }
-            catch (FileNotFoundException e)
-            {
-                log.Error("Could not find token: {filePath}", filePath);
+            } catch (FileNotFoundException e) {
+                log.Fatal("Could not find token: {filePath}", filePath);
                 throw new FileNotFoundException("Cannot find token file.", e);
             }
         }
 
-        public void WriteToken(Token t)
-        {
+        public void WriteToken(Token t) {
             log.Information("Writing token: {filePath}", filePath);
             log.Debug("{@token}", t);
             File.WriteAllText(filePath, t.ToJson());

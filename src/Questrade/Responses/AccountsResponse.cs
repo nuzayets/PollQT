@@ -1,5 +1,5 @@
-﻿using PollQT.DataTypes;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using PollQT.DataTypes;
 
 namespace PollQT.Questrade.Responses
 {
