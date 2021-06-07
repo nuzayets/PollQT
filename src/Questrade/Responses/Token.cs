@@ -1,8 +1,6 @@
 using System;
 using System.Text;
-using System.Linq;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace PollQT.Questrade.Responses
 {
@@ -12,19 +10,23 @@ namespace PollQT.Questrade.Responses
         public string? RefreshToken { get; set; }
         public string? ApiServer { get; set; }
 
-        private static readonly JsonSerializerOptions jsonSerializerOptions = 
+        private static readonly JsonSerializerOptions jsonSerializerOptions =
             new JsonSerializerOptions { PropertyNamingPolicy = new SnakeCaseNamingPolicy() };
 
-        public new string ToJson() => this.ToJson(jsonSerializerOptions);
-        public new static Token FromJson(string json) => Token.FromJson(json, jsonSerializerOptions);
+        public new string ToJson() => ToJson(jsonSerializerOptions);
 
+        public static new Token FromJson(string json) => Token.FromJson(json, jsonSerializerOptions);
     }
 
-    class SnakeCaseNamingPolicy : JsonNamingPolicy
+    internal class SnakeCaseNamingPolicy : JsonNamingPolicy
     {
         public override string ConvertName(string name)
         {
-            if (name == null) throw new ArgumentNullException(nameof(name));
+            if (name == null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
             var result = new StringBuilder();
             for (var i = 0; i < name.Length; i++)
             {

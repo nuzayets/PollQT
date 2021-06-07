@@ -1,7 +1,6 @@
-using Xunit;
-using System;
 using PollQT.Questrade.Responses;
 using System.Text.RegularExpressions;
+using Xunit;
 
 namespace PollQT.Questrade
 {
@@ -34,7 +33,7 @@ namespace PollQT.Questrade
             var t = Token.FromJson(json);
             var s = t.ToJson();
             var t2 = Token.FromJson(s);
-            Assert.Equal(t,t2);
+            Assert.Equal(t, t2);
         }
 
         [Theory]

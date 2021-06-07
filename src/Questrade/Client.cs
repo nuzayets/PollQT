@@ -1,3 +1,4 @@
+using PollQT.DataTypes;
 using PollQT.Questrade.Responses;
 using Serilog;
 using System;
@@ -10,11 +11,11 @@ using System.Threading.Tasks;
 
 namespace PollQT.Questrade
 {
-    
+
     public class Client
     {
-        private Token Token { get; set;  }
-        private HttpClient HttpClient { get; set;  }
+        private Token Token { get; set; }
+        private HttpClient HttpClient { get; set; }
 
         private readonly ITokenStore tokenStore;
         private readonly ILogger log;
@@ -30,7 +31,7 @@ namespace PollQT.Questrade
 
         public Client(Context context)
         {
-            this.log = context.Logger;
+            log = context.Logger;
             HttpClient = new HttpClient();
             Token = new Token();
 
@@ -41,43 +42,45 @@ namespace PollQT.Questrade
                 Directory.CreateDirectory(context.WorkDir);
             }
 
-            this.tokenStore = new FileTokenStore(log, Path.Combine(context.WorkDir, "token.json"));
+            tokenStore = new FileTokenStore(log, Path.Combine(context.WorkDir, "token.json"));
             log.Information("tokenStore: {tokenStore}", tokenStore);
 
-            NewToken(tokenStore.GetToken(), supressWrite: true);   
+            NewToken(tokenStore.GetToken(), supressWrite: true);
         }
 
-        private string RequestRoute(RequestType requestType, string? id = default)
+        private string RequestRoute(RequestType requestType, string? id = default) => requestType switch
         {
-            return requestType switch
-            {
-                RequestType.TOKEN => 
-                    $"https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token={Token.RefreshToken}",
+            RequestType.TOKEN =>
+                $"https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token={Token.RefreshToken}",
 
-                RequestType.ACCOUNTS => "/v1/accounts/",
+            RequestType.ACCOUNTS => "/v1/accounts/",
 
-                RequestType.ACCOUNT_BALANCES => $"/v1/accounts/{id}/balances",
+            RequestType.ACCOUNT_BALANCES => $"/v1/accounts/{id}/balances",
 
-                RequestType.ACCOUNT_POSITIONS => $"/v1/accounts/{id}/positions",
+            RequestType.ACCOUNT_POSITIONS => $"/v1/accounts/{id}/positions",
 
-                _ => throw new NotImplementedException()
-            };
-        }
+            _ => throw new NotImplementedException()
+        };
 
         private void NewToken(Token token, bool supressWrite = false)
         {
             Token = token;
             HttpClient = new HttpClient();
             HttpClient.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse($"Bearer {token.AccessToken}");
-            if (token.ApiServer != null) HttpClient.BaseAddress = new Uri(token.ApiServer);
+            if (token.ApiServer != null)
+            {
+                HttpClient.BaseAddress = new Uri(token.ApiServer);
+            }
+
             if (!supressWrite)
             {
                 tokenStore.WriteToken(token);
             }
         }
 
-        private class ApiException : Exception { 
-            public ApiException(string message): base(message) {}
+        private class ApiException : Exception
+        {
+            public ApiException(string message) : base(message) { }
             public ApiException() : base() { }
         }
         private class UnauthorizedException : ApiException { }
@@ -85,7 +88,7 @@ namespace PollQT.Questrade
 
         private async Task<string> MakeRequest(RequestType type, string? id = default)
         {
-            string route = RequestRoute(type, id);
+            var route = RequestRoute(type, id);
             log.Information("Request: {type}", type);
             var stopWatch = Stopwatch.StartNew();
             var resp = await HttpClient.GetAsync(route);
@@ -126,34 +129,32 @@ namespace PollQT.Questrade
             log.Information("{resName}: {@res}", resObj.GetType(), resObj);
             return resObj;
         }
-        
-        // wish I could use Record type, alas this may run in an AWS Lambda handler which currently supports NET Core 3.1
-        // unless I build a custom image but who has the time for that
-        private async Task<List<(Account Account, AccountBalance Balance, List<AccountPositions> Positions)>> Poll()
+
+        private async Task<List<PollResult>> Poll()
         {
             if (Token.ApiServer is null || Token.AccessToken is null)
             {
                 await Login();
             }
-            var resp = new List<(Account Account, AccountBalance Balance, List<AccountPositions> Positions)>();
+            var resp = new List<PollResult>();
             var accounts = await GetResponse<AccountsResponse>(RequestType.ACCOUNTS);
             foreach (var account in accounts.Accounts)
             {
                 var accountBalances = await GetResponse<AccountBalancesResponse>(RequestType.ACCOUNT_BALANCES, account.Number);
                 var accountPositions = await GetResponse<AccountPositionsResponse>(RequestType.ACCOUNT_POSITIONS, account.Number);
-                resp.Add((account, accountBalances.CombinedBalances[0], accountPositions.Positions));
+                resp.Add(new PollResult(account, accountBalances.CombinedBalances[0], accountPositions.Positions));
             }
             return resp;
         }
 
-        public async Task<List<(Account Account, AccountBalance Balance, List<AccountPositions> Positions)>> PollWithRetry(int maxRetries = 10)
+        public async Task<List<PollResult>> PollWithRetry(int maxRetries = 10)
         {
-            ExponentialBackoff backoff = new ExponentialBackoff(maxRetries, delayMilliseconds: 200, maxDelayMilliseconds: 120000);
-            retry:
+            var backoff = new ExponentialBackoff(maxRetries, delayMilliseconds: 200, maxDelayMilliseconds: 120000);
+        retry:
             try
             {
                 return await Poll();
-            } 
+            }
             catch (ApiException e)
             {
                 Log.Error("API exception {e}, backing off to retry in {delay} ms.", e, backoff.NextDelay);

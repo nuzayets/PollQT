@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace PollQT.Questrade
@@ -10,10 +8,7 @@ namespace PollQT.Questrade
         private readonly int maxRetries, delayMilliseconds, maxDelayMilliseconds;
         private int retries, pow;
 
-        public int NextDelay
-        {
-            get { return Math.Min(delayMilliseconds * (pow - 1) / 2, maxDelayMilliseconds); }
-        }
+        public int NextDelay => Math.Min(delayMilliseconds * (pow - 1) / 2, maxDelayMilliseconds);
 
         public ExponentialBackoff(int maxRetries, int delayMilliseconds,
             int maxDelayMilliseconds)
@@ -36,7 +31,7 @@ namespace PollQT.Questrade
             {
                 pow <<= 1; // m_pow = Pow(2, m_retries - 1)
             }
-            int delay = NextDelay;
+            var delay = NextDelay;
             return Task.Delay(delay);
         }
     }

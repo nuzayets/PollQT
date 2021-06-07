@@ -1,9 +1,6 @@
 ﻿using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace PollQT.Questrade
+namespace PollQT
 {
     public struct Context
     {
@@ -12,8 +9,8 @@ namespace PollQT.Questrade
 
         public Context(ILogger logger, string workDir)
         {
-            this.Logger = logger;
-            this.WorkDir = workDir;
+            Logger = logger;
+            WorkDir = workDir;
         }
     }
 }

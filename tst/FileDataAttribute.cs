@@ -12,15 +12,14 @@ namespace PollQT.Questrade
 
         public FileDataAttribute(string filePath) : base() => this.filePath = filePath;
 
-
         public override IEnumerable<object[]> GetData(MethodInfo testMethod)
         {
             if (testMethod == null) { throw new ArgumentNullException(nameof(testMethod)); }
 
             // Get the absolute path to the file
-            var path = Path.IsPathRooted(this.filePath)
-                ? this.filePath
-                : Path.GetRelativePath(Directory.GetCurrentDirectory(), this.filePath);
+            var path = Path.IsPathRooted(filePath)
+                ? filePath
+                : Path.GetRelativePath(Directory.GetCurrentDirectory(), filePath);
 
             if (!File.Exists(path))
             {
@@ -28,7 +27,7 @@ namespace PollQT.Questrade
             }
 
             // Load the file
-            var fileData = File.ReadAllText(this.filePath);
+            var fileData = File.ReadAllText(filePath);
             var testCase = new object[] { fileData };
 
             return new List<object[]> { testCase };
