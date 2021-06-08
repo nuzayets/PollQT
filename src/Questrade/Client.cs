@@ -5,9 +5,11 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Threading.Tasks;
 using PollQT.DataTypes;
 using PollQT.Questrade.Responses;
+using PollQT.Util;
 using Serilog;
 namespace PollQT.Questrade
 {
@@ -131,11 +133,15 @@ namespace PollQT.Questrade
             var backoff = new ExponentialBackoff(maxRetries, delayMilliseconds: 200, maxDelayMilliseconds: 120000);
         retry:
             try {
-                return await Poll();
-            } catch (ApiException e) {
-                log.Error(e, "API error - backing off to retry in {delay} ms.", backoff.NextDelay);
-                await backoff.Delay();
-                goto retry;
+                return await Poll().TimeoutAfter(TimeSpan.FromSeconds(5));
+            } catch (Exception e) {
+                if (e is ApiException || e is TimeoutException) {
+                    log.Error(e, "API issue - backing off to retry in {delay} ms.", backoff.NextDelay);
+                    await backoff.Delay();
+                    goto retry;
+                } else {
+                    throw;
+                }
             }
         }
     }
