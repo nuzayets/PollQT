@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-
 namespace PollQT.Questrade.Responses
 {
     /// <summary>
@@ -20,16 +19,13 @@ namespace PollQT.Questrade.Responses
         /// The API server the token-granter pointed us towards
         /// </summary>
         public string? ApiServer { get; set; }
-
         private static readonly JsonSerializerOptions jsonSerializerOptions =
             new() { PropertyNamingPolicy = new SnakeCaseNamingPolicy() };
-
         /// <summary>
         /// Serialize to JSON but use non default web options - snake_case property names.
         /// </summary>
         /// <returns>JSON token with snake_case props</returns>
         public new string ToJson() => ToJson(jsonSerializerOptions);
-
         /// <summary>
         /// Deserializes from JSON given snake_case props
         /// </summary>
@@ -37,7 +33,6 @@ namespace PollQT.Questrade.Responses
         /// <returns>new Token</returns>
         public static new Token FromJson(string json) => Token.FromJson(json, jsonSerializerOptions);
     }
-
     internal class SnakeCaseNamingPolicy : JsonNamingPolicy
     {
         public override string ConvertName(string name) {

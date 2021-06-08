@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-
 namespace PollQT.DataTypes
 {
     internal class PollResult : JsonSerializable<PollResult>
@@ -9,8 +8,6 @@ namespace PollQT.DataTypes
         public Account Account { get; }
         public AccountBalance Balance { get; }
         public List<AccountPosition> Positions { get; }
-
-
         public PollResult(Account account, AccountBalance balance, List<AccountPosition> positions) {
             Timestamp = DateTimeOffset.UtcNow;
             Account = account;

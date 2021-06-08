@@ -6,24 +6,19 @@ using System.Text;
 using System.Threading.Tasks;
 using PollQT.DataTypes;
 using Serilog;
-
 namespace PollQT.OutputSinks
 {
     internal class InfluxLineProtolOutputSink : IOutputSink
     {
         private readonly ILogger log;
         private readonly ConcurrentDictionary<string, PollResult> prevResults = new();
-
         public InfluxLineProtolOutputSink(Context context) {
             log = context.Logger.ForContext<InfluxLineProtolOutputSink>();
             log.Information("Starting Influx Line Protocol output sink");
         }
-
-
         private bool ShouldWrite(PollResult pollResult) {
             // don't write entries with the exact same data as before
             var entry = prevResults.GetOrAdd(pollResult.Account.Number, pollResult);
-
             if (pollResult.Positions.SequenceEqual(entry.Positions)
                 && pollResult.Balance.Equals(entry.Balance)) {
                 // if the data match & timestamp match, do write - GetOrAdd did Add
@@ -35,7 +30,6 @@ namespace PollQT.OutputSinks
                 return true;
             }
         }
-
         public async Task NewEvent(List<PollResult> pollResults) {
             foreach (var pollResult in pollResults.Where(ShouldWrite)) {
                 WriteBalances(pollResult);
@@ -43,12 +37,10 @@ namespace PollQT.OutputSinks
             }
             await Task.CompletedTask;
         }
-
         private static string Measurement(string m) => m;
         private static string Tag(string k, string v) => $",{k}={v}";
         private static string Value<T>(string k, T v, bool first = false) => first ? $" {k}={v}" : $",{k}={v}";
         private static string Time(DateTimeOffset t) => $" {((ulong)t.ToUnixTimeMilliseconds()) * 1000000}";
-
         private static void WritePositions(PollResult pollResult) {
             foreach (var position in pollResult.Positions) {
                 var line = new StringBuilder()

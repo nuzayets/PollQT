@@ -1,7 +1,6 @@
 ﻿using System;
 using Serilog.Core;
 using Serilog.Events;
-
 namespace PollQT.Util
 {
     internal class ArgumentLoggingLevelSwitch : LoggingLevelSwitch

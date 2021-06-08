@@ -1,5 +1,4 @@
 using PollQT.Questrade.Responses;
-
 namespace PollQT.Questrade
 {
     internal interface ITokenStore

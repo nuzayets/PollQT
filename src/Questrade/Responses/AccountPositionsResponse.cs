@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using PollQT.DataTypes;
-
 namespace PollQT.Questrade.Responses
 {
     internal class AccountPositionsResponse : JsonSerializable<AccountPositionsResponse>

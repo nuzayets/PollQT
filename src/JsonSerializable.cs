@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-
 namespace PollQT
 {
     /// <summary>
@@ -16,7 +15,6 @@ namespace PollQT
             PropertyNameCaseInsensitive = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
-
         /// <summary>
         /// Deserializes into a new object or throws
         /// </summary>
@@ -25,33 +23,28 @@ namespace PollQT
         /// <returns></returns>
         public static T FromJson(string json, JsonSerializerOptions options) =>
             JsonSerializer.Deserialize<T>(json, options) ?? throw new JsonException($"Error parsing {json}");
-
         /// <summary>
         /// Deserializes into a new object or throws. Uses default web options - case insensitive and camel-case.
         /// </summary>
         /// <param name="json">the JSON</param>
         /// <returns></returns>
         public static T FromJson(string json) => FromJson(json, defaultJsonSerializerOptions);
-
         /// <summary>
         ///  Serializes to JSON. 
         /// </summary>
         /// <param name="options">the options</param>
         /// <returns></returns>
         public string ToJson(JsonSerializerOptions options) => JsonSerializer.Serialize(this, typeof(T), options);
-
         /// <summary>
         ///  Serializes to JSON. Uses default web options - case insensitive and camel-case.
         /// </summary>
         /// <returns></returns>
         public string ToJson() => ToJson(defaultJsonSerializerOptions);
-
         /// <summary>
         /// 
         /// </summary>
         /// <returns>Just hashes the JSON. Don't use for performance critical stuff.</returns>
         public override int GetHashCode() => ToJson().GetHashCode();
-
         /// <summary>
         /// 
         /// </summary>

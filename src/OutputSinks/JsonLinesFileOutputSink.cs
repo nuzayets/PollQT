@@ -3,20 +3,17 @@ using System.IO;
 using System.Threading.Tasks;
 using PollQT.DataTypes;
 using Serilog;
-
 namespace PollQT.OutputSinks
 {
     internal class JsonLinesFileOutputSink : IOutputSink
     {
         private readonly ILogger log;
         private readonly string outDir;
-
         public JsonLinesFileOutputSink(Context context) {
             log = context.Logger.ForContext<JsonLinesFileOutputSink>();
             outDir = Path.Combine(context.WorkDir, "out");
             Directory.CreateDirectory(outDir);
         }
-
         public async Task NewEvent(List<PollResult> pollResults) {
             foreach (var pollResult in pollResults) {
                 var outFile = Path.Combine(outDir, $"{pollResult.Timestamp:yyyyMMdd}.jsonl");

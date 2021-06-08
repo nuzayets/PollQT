@@ -1,15 +1,12 @@
 ﻿using System;
 using System.Threading.Tasks;
-
 namespace PollQT.Questrade
 {
     internal struct ExponentialBackoff
     {
         private readonly int maxRetries, delayMilliseconds, maxDelayMilliseconds;
         private int retries, pow;
-
         public int NextDelay => Math.Min(delayMilliseconds * (pow - 1) / 2, maxDelayMilliseconds);
-
         public ExponentialBackoff(int maxRetries, int delayMilliseconds,
             int maxDelayMilliseconds) {
             this.maxRetries = maxRetries;
@@ -18,7 +15,6 @@ namespace PollQT.Questrade
             retries = 0;
             pow = 1;
         }
-
         public Task Delay() {
             if (retries == maxRetries) {
                 throw new TimeoutException("Max retry attempts exceeded.");
