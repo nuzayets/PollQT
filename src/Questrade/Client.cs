@@ -119,10 +119,11 @@ namespace PollQT.Questrade
             }
             var resp = new List<PollResult>();
             var accounts = await GetResponse<AccountsResponse>(RequestType.ACCOUNTS);
+            var timestamp = DateTimeOffset.UtcNow;
             foreach (var account in accounts.Accounts) {
                 var accountBalances = await GetResponse<AccountBalancesResponse>(RequestType.ACCOUNT_BALANCES, account.Number);
                 var accountPositions = await GetResponse<AccountPositionsResponse>(RequestType.ACCOUNT_POSITIONS, account.Number);
-                resp.Add(new PollResult(account, accountBalances.CombinedBalances[0], accountPositions.Positions));
+                resp.Add(new PollResult(timestamp, account, accountBalances.CombinedBalances[0], accountPositions.Positions));
             }
             return resp;
         }
