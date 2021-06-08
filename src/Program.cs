@@ -6,7 +6,6 @@ using PollQT.DataTypes;
 using PollQT.OutputSinks;
 using PollQT.Util;
 using Serilog;
-using Serilog.Core;
 using Serilog.Sinks.SystemConsole.Themes;
 
 namespace PollQT
@@ -15,60 +14,61 @@ namespace PollQT
     {
         public static event EventHandler<List<PollResult>>? RaisePollResults;
 
-        private static string ConfigureWorkingDirectory() {
-#if DEBUG
-            var workDirName = ".pollqt-dbg";
-#else
-            var workDirName = ".pollqt";
-#endif
+        /// <param name="workDir">The directory to store token file, logs, and output.</param>
+        /// <param name="logLevel">Minimum Log Level, one of Verbose, Debug, Information, Warning, Error.</param>
+        /// <param name="influxOutput">True to output Influx Line Protocol on STDOUT (for use with Telegraf)</param>
+        /// <param name="fileOutput">True to output JSONL to <c>workDir/out/yyyyMMdd.jsonl</c></param>
+        /// <param name="logConsole">True to log to console</param>
+        /// <param name="logFile">True to log to file in <c>workDir/log/pollqtyyyyMMdd.log</c></param>
+        private static void Main(
+            string workDir,
+            string logLevel = "Information",
+            bool influxOutput = true,
+            bool fileOutput = false,
+            bool logConsole = false,
+            bool logFile = true) {
 
-            var workDir = Environment.GetEnvironmentVariable("POLLQT_WORKDIR") ??
-    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), workDirName);
-
-            return workDir;
-        }
-
-        private static Logger ConfigureLogger(string workDir) {
-#if DEBUG
-            var baseConfig = new LoggerConfiguration().MinimumLevel.Verbose();
-#else
-            var baseConfig = new LoggerConfiguration().MinimumLevel.Information();
-#endif
-            return baseConfig
+            var workDirFinal = workDir.Length > 0 ? workDir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".pollqt");
+            var logConfig = new LoggerConfiguration()
                 .Enrich.WithThreadId()
                 .Enrich.WithUtcTimestamp()
-                //.WriteTo.Console(theme: AnsiConsoleTheme.Code,
-                //    outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}",
-                //    standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
-                .WriteTo.Map("UtcTimestamp", DateTime.UtcNow,
-                    (UtcDateTime, wt) => wt.File(Path.Combine(workDir, $"logs/pollqt{UtcDateTime:yyyyMMdd}.log")))
-                .CreateLogger();
-        }
+                .MinimumLevel.ControlledBy(new ArgumentLoggingLevelSwitch(logLevel));
 
-        private static void Main() {
-            var workDir = ConfigureWorkingDirectory();
-            using var log = ConfigureLogger(workDir);
+            if (logConsole) {
+                if (influxOutput) {
+                    Console.Error.WriteLine("WARNING: Logging to console defeats the purpose of getting Influx Line Protocol on STDOUT!");
+                }
+                logConfig = logConfig
+                    .WriteTo.Console(theme: AnsiConsoleTheme.Code,
+                    outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}",
+                    standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose);
+            }
 
-            var context = new Context(log, workDir);
+            if (logFile) {
+                logConfig = logConfig
+                    .WriteTo.Map("UtcTimestamp", DateTime.UtcNow,
+                    (UtcDateTime, wt) => wt.File(
+                        Path.Combine(workDirFinal, $"logs/pollqt{UtcDateTime:yyyyMMdd}.log"),
+                        outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}"));
+            }
+
+            using var log = logConfig.CreateLogger();
+
+            var context = new Context(log, workDirFinal);
             var client = new Questrade.Client(context);
 
-            if (Environment.GetEnvironmentVariable("FILE_OUT") != null) {
+            if (fileOutput) {
                 var fileWriter = new JsonLinesFileOutputSink(context);
                 RaisePollResults += async (s, e) => await fileWriter.NewEvent(e);
             }
-            
-            if (Environment.GetEnvironmentVariable("TS_DBNAME") != null) { 
-                using var awsWriter = new AwsTimestreamOutputSink(context);
-                RaisePollResults += async (s, e) => await awsWriter.NewEvent(e);
-            }
 
-            if (Environment.GetEnvironmentVariable("INFLUX_OUT") != null || true) {
-                var fileWriter = new InfluxLineProtolOutputSink(context);
-                RaisePollResults += async (s, e) => await fileWriter.NewEvent(e);
+            if (influxOutput) {
+                var influxWriter = new InfluxLineProtolOutputSink(context);
+                RaisePollResults += async (s, e) => await influxWriter.NewEvent(e);
             }
 
             while (true) {
-                try { 
+                try {
                     var pollResults = client.PollWithRetry().Result;
                     log.Verbose("Got poll result: {@res}", pollResults);
                     RaisePollResults?.Invoke(null, pollResults);

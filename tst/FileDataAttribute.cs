@@ -6,7 +6,7 @@ using Xunit.Sdk;
 
 namespace PollQT.Questrade
 {
-    public class FileDataAttribute : DataAttribute
+    internal class FileDataAttribute : DataAttribute
     {
         private readonly string filePath;
 

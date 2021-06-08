@@ -13,7 +13,7 @@ using Serilog;
 namespace PollQT.Questrade
 {
 
-    public class Client
+    internal class Client
     {
         private Token Token { get; set; }
         private HttpClient HttpClient { get; set; }

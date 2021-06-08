@@ -3,7 +3,7 @@ using PollQT.DataTypes;
 
 namespace PollQT.Questrade.Responses
 {
-    public class AccountBalancesResponse : JsonSerializable<AccountBalancesResponse>
+    internal class AccountBalancesResponse : JsonSerializable<AccountBalancesResponse>
     {
         public List<AccountBalance> PerCurrencyBalances { get; set; } = new List<AccountBalance>();
         public List<AccountBalance> CombinedBalances { get; set; } = new List<AccountBalance>();

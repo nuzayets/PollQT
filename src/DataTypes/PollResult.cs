@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace PollQT.DataTypes
 {
-    public class PollResult : JsonSerializable<PollResult>
+    internal class PollResult : JsonSerializable<PollResult>
     {
         public DateTimeOffset Timestamp { get; }
         public Account Account { get; }

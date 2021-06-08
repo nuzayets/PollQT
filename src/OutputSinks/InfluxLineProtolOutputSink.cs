@@ -3,20 +3,16 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using Amazon;
-using Amazon.TimestreamWrite;
-using Amazon.TimestreamWrite.Model;
 using PollQT.DataTypes;
 using Serilog;
 
 namespace PollQT.OutputSinks
 {
-    class InfluxLineProtolOutputSink : IOutputSink
+    internal class InfluxLineProtolOutputSink : IOutputSink
     {
         private readonly ILogger log;
-        private readonly ConcurrentDictionary<string, PollResult> prevResults = new ConcurrentDictionary<string, PollResult>();
+        private readonly ConcurrentDictionary<string, PollResult> prevResults = new();
 
         public InfluxLineProtolOutputSink(Context context) {
             log = context.Logger.ForContext<InfluxLineProtolOutputSink>();
@@ -48,12 +44,12 @@ namespace PollQT.OutputSinks
             await Task.CompletedTask;
         }
 
-        private string Measurement(string m) => m;
-        private string Tag(string k, string v) => $",{k}={v}";
-        private string Value<T>(string k, T v, bool first = false) => first ? $" {k}={v}" : $",{k}={v}";
-        private string Time(DateTimeOffset t) => $" {(((UInt64)t.ToUnixTimeMilliseconds()) * 1000000).ToString()}";
+        private static string Measurement(string m) => m;
+        private static string Tag(string k, string v) => $",{k}={v}";
+        private static string Value<T>(string k, T v, bool first = false) => first ? $" {k}={v}" : $",{k}={v}";
+        private static string Time(DateTimeOffset t) => $" {((ulong)t.ToUnixTimeMilliseconds()) * 1000000}";
 
-        private void WritePositions(PollResult pollResult) {
+        private static void WritePositions(PollResult pollResult) {
             foreach (var position in pollResult.Positions) {
                 var line = new StringBuilder()
                     .Append(Measurement("position"))
@@ -68,7 +64,7 @@ namespace PollQT.OutputSinks
                 Console.Out.WriteLine(line);
             }
         }
-        private void WriteBalances(PollResult pollResult) {
+        private static void WriteBalances(PollResult pollResult) {
             var line = new StringBuilder()
                 .Append(Measurement("balance"))
                 .Append(Tag("account", $"{pollResult.Account.Type}-{pollResult.Account.Number}"))

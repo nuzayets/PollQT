@@ -11,7 +11,7 @@ namespace PollQT.Util
         public void Enrich(LogEvent logEvent, ILogEventPropertyFactory pf) => logEvent.AddPropertyIfAbsent(pf.CreateProperty("UtcTimestamp", logEvent.Timestamp.UtcDateTime));
     }
 
-    public static class PollQTLoggerConfigurationExtensions
+    internal static class PollQTLoggerConfigurationExtensions
     {
         public static LoggerConfiguration WithUtcTimestamp(this LoggerEnrichmentConfiguration enrichmentConfiguration) {
             _ = enrichmentConfiguration ?? throw new ArgumentNullException(nameof(enrichmentConfiguration));

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace PollQT.Questrade
 {
-    public struct ExponentialBackoff
+    internal struct ExponentialBackoff
     {
         private readonly int maxRetries, delayMilliseconds, maxDelayMilliseconds;
         private int retries, pow;
