@@ -1,6 +1,6 @@
 ﻿namespace PollQT.DataTypes
 {
-    public class AccountBalance
+    public class AccountBalance : JsonSerializable<AccountBalance>
     {
         public string Currency { get; set; } = "";
         public double Cash { get; set; } = default;

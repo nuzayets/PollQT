@@ -1,6 +1,6 @@
 ﻿namespace PollQT.DataTypes
 {
-    public class AccountPosition
+    public class AccountPosition : JsonSerializable<AccountPosition>
     {
         public string Symbol { get; set; } = "";
         public int SymbolId { get; set; } = default;

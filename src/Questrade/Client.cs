@@ -103,7 +103,7 @@ namespace PollQT.Questrade
             log.Debug("Response: {resp}", resp);
             if (!resp.IsSuccessStatusCode) {
                 if (resp.StatusCode == HttpStatusCode.Unauthorized && retries == 0) {
-                    log.Information("Unuthorized: {type} ({dur}ms)", type, resp, stopwatch.ElapsedMilliseconds);
+                    log.Information("Unuthorized: {type} ({dur}ms)", type, stopwatch.ElapsedMilliseconds);
                     // We get unauthorized often -- let's not throw an exception, log in here and retry
                     await Login();
                     return await MakeRequest(type, id, retries: retries + 1);

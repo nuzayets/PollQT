@@ -1,6 +1,6 @@
 ﻿namespace PollQT.DataTypes
 {
-    public class Account
+    public class Account : JsonSerializable<Account>
     {
         public string Type { get; set; } = "";
         public string Number { get; set; } = "";

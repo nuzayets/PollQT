@@ -38,7 +38,8 @@ namespace PollQT
                 .Enrich.WithThreadId()
                 .Enrich.WithUtcTimestamp()
                 .WriteTo.Console(theme: AnsiConsoleTheme.Code,
-                    outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}")
+                    outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}",
+                    standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
                 .WriteTo.Map("UtcTimestamp", DateTime.UtcNow,
                     (UtcDateTime, wt) => wt.File(Path.Combine(workDir, $"logs/pollqt{UtcDateTime:yyyyMMdd}.log")))
                 .CreateLogger();
@@ -51,13 +52,29 @@ namespace PollQT
             var context = new Context(log, workDir);
             var client = new Questrade.Client(context);
 
-            var fileWriter = new JsonLinesFileOutputSink(context);
-            RaisePollResults += async (s, e) => await fileWriter.NewEvent(e);
+            if (Environment.GetEnvironmentVariable("FILE_OUT") != null) {
+                var fileWriter = new JsonLinesFileOutputSink(context);
+                RaisePollResults += async (s, e) => await fileWriter.NewEvent(e);
+            }
+            
+            if (Environment.GetEnvironmentVariable("TS_DBNAME") != null) { 
+                using var awsWriter = new AwsTimestreamOutputSink(context);
+                RaisePollResults += async (s, e) => await awsWriter.NewEvent(e);
+            }
+
+            if (Environment.GetEnvironmentVariable("INFLUX_OUT") != null || true) {
+                var fileWriter = new InfluxLineProtolOutputSink(context);
+                RaisePollResults += async (s, e) => await fileWriter.NewEvent(e);
+            }
 
             while (true) {
-                var pollResults = client.PollWithRetry().Result;
-                log.Verbose("Got poll result: {@res}", pollResults);
-                RaisePollResults(null, pollResults);
+                try { 
+                    var pollResults = client.PollWithRetry().Result;
+                    log.Verbose("Got poll result: {@res}", pollResults);
+                    RaisePollResults?.Invoke(null, pollResults);
+                } catch (Exception e) {
+                    log.Error(e, "Unhandled exception");
+                }
                 Thread.Sleep(60 * 1000);
             }
         }
