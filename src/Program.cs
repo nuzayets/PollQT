@@ -37,9 +37,9 @@ namespace PollQT
             return baseConfig
                 .Enrich.WithThreadId()
                 .Enrich.WithUtcTimestamp()
-                .WriteTo.Console(theme: AnsiConsoleTheme.Code,
-                    outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}",
-                    standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
+                //.WriteTo.Console(theme: AnsiConsoleTheme.Code,
+                //    outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}",
+                //    standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
                 .WriteTo.Map("UtcTimestamp", DateTime.UtcNow,
                     (UtcDateTime, wt) => wt.File(Path.Combine(workDir, $"logs/pollqt{UtcDateTime:yyyyMMdd}.log")))
                 .CreateLogger();
