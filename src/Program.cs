@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using PollQT.DataTypes;
 using PollQT.OutputSinks;
 using PollQT.Util;
@@ -18,13 +20,21 @@ namespace PollQT
         /// <param name="fileOutput">True to output JSONL to <c>workDir/out/yyyyMMdd.jsonl</c></param>
         /// <param name="logConsole">True to log to console</param>
         /// <param name="logFile">True to log to file in <c>workDir/log/pollqtyyyyMMdd.log</c></param>
+        /// <param name="convertFile">Convert a JSONL file to Influx Line Protocol</param>
         private static void Main(
             string workDir,
             string logLevel = "Information",
             bool influxOutput = true,
             bool fileOutput = false,
             bool logConsole = false,
-            bool logFile = true) {
+            bool logFile = true,
+            string convertFile = "") {
+
+            if (convertFile.Length > 0) {
+                doConvertFile(convertFile).Wait();
+                return;
+            }
+
             var workDirFinal = workDir.Length > 0 ? workDir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".pollqt");
             var logConfig = new LoggerConfiguration()
                 .Enrich.WithThreadId()
@@ -44,7 +54,8 @@ namespace PollQT
                     .WriteTo.Map("UtcTimestamp", DateTime.UtcNow,
                     (UtcDateTime, wt) => wt.File(
                         Path.Combine(workDirFinal, $"logs/pollqt{UtcDateTime:yyyyMMdd}.log"),
-                        outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}"));
+                        outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}"),
+                    sinkMapCountLimit: 10);
             }
             using var log = logConfig.CreateLogger();
             var context = new Context(log, workDirFinal);
@@ -67,6 +78,12 @@ namespace PollQT
                 }
                 Thread.Sleep(60 * 1000);
             }
+        }
+
+        private static async Task doConvertFile(string convertFile) {
+            var influxWriter = new InfluxLineProtolOutputSink(new Context(Log.Logger, ""));
+            List<PollResult> results = new List<PollResult>( File.ReadAllLines(convertFile).Select( l => PollResult.FromJson(l) ) );
+            await influxWriter.NewEvent(results);
         }
     }
 }
