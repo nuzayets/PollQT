@@ -14,14 +14,18 @@ namespace PollQT
     internal class Program
     {
         public static event EventHandler<List<PollResult>>? RaisePollResults;
+
+        private static Questrade.Client? client;
+        private static ILogger? log;
+
         /// <param name="workDir">The directory to store token file, logs, and output</param>
         /// <param name="logLevel">Minimum Log Level, one of Verbose, Debug, Information, Warning, Error</param>
         /// <param name="influxOutput">True to output Influx Line Protocol on STDOUT (for use with Telegraf)</param>
         /// <param name="fileOutput">True to output JSONL to <c>workDir/out/yyyyMMdd.jsonl</c></param>
         /// <param name="logConsole">True to log to console</param>
         /// <param name="logFile">True to log to file in <c>workDir/log/pollqtyyyyMMdd.log</c></param>
-        /// <param name="convertFile">Convert a JSONL file to Influx Line Protocol</param>
-        private static void Main(
+        /// <param name="convertFile">Convert a JSONL file to Influx Line Protocol and exit</param>
+        private static async Task Main(
             string workDir,
             string logLevel = "Information",
             bool influxOutput = true,
@@ -31,35 +35,37 @@ namespace PollQT
             string convertFile = "") {
 
             if (convertFile.Length > 0) {
-                doConvertFile(convertFile).Wait();
+                await DoConvertFile(convertFile);
                 return;
             }
 
             var workDirFinal = workDir.Length > 0 ? workDir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".pollqt");
             var logConfig = new LoggerConfiguration()
                 .Enrich.WithThreadId()
-                .Enrich.WithUtcTimestamp()
                 .MinimumLevel.ControlledBy(new ArgumentLoggingLevelSwitch(logLevel));
             if (logConsole) {
-                if (influxOutput) {
-                    Console.Error.WriteLine("WARNING: Logging to console defeats the purpose of getting Influx Line Protocol on STDOUT!");
-                }
                 logConfig = logConfig
-                    .WriteTo.Console(theme: AnsiConsoleTheme.Code,
-                    outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}",
-                    standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose);
+                    .WriteTo.Console(
+                    // if we're building in debug mode, we're not actually running under influx so just do the default
+#if !DEBUG
+                    // write warnings and above only if we are in influx mode (Telegraf plugin errors mean something)
+                    restrictedToMinimumLevel: influxOutput ? Serilog.Events.LogEventLevel.Warning : Serilog.Events.LogEventLevel.Verbose,
+                    // write everything to stderr in influx mode (because stdout is our output), otherwise everything to stdout
+                    standardErrorFromLevel: influxOutput ? Serilog.Events.LogEventLevel.Verbose : null,
+#endif
+                    theme: AnsiConsoleTheme.Code,
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}");
             }
             if (logFile) {
                 logConfig = logConfig
-                    .WriteTo.Map("UtcTimestamp", DateTime.UtcNow,
-                    (UtcDateTime, wt) => wt.File(
-                        Path.Combine(workDirFinal, $"logs/pollqt{UtcDateTime:yyyyMMdd}.log"),
-                        outputTemplate: "[{UtcTimestamp:HH:mm:ssK} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}"),
-                    sinkMapCountLimit: 10);
+                    .WriteTo.File(
+                        Path.Combine(workDirFinal, "logs/pollqt.log"),
+                        outputTemplate: "[{Timestamp:HH:mm:ss} {SourceContext}-{ThreadId} {Level:u3}] {Message:l}{NewLine}{Exception}",
+                        rollingInterval: RollingInterval.Day);
             }
-            using var log = logConfig.CreateLogger();
+            log = logConfig.CreateLogger();
             var context = new Context(log, workDirFinal);
-            var client = new Questrade.Client(context);
+            client = new Questrade.Client(context);
             if (fileOutput) {
                 var fileWriter = new JsonLinesFileOutputSink(context);
                 RaisePollResults += async (s, e) => await fileWriter.NewEvent(e);
@@ -68,21 +74,29 @@ namespace PollQT
                 var influxWriter = new InfluxLineProtolOutputSink(context);
                 RaisePollResults += async (s, e) => await influxWriter.NewEvent(e);
             }
+            await DoPollIndefinitely();
+        }
+
+        private static async Task DoPollIndefinitely() {
             while (true) {
                 try {
-                    var pollResults = client.PollWithRetry().Result;
-                    log.Verbose("Got poll result: {@res}", pollResults);
-                    RaisePollResults?.Invoke(null, pollResults);
+                    if (client != null) {
+                        var pollResults = await client.PollWithRetry();
+                        log?.Verbose("Got poll result: {@res}", pollResults);
+                        RaisePollResults?.Invoke(null, pollResults);
+                    } else {
+                        log?.Error("Static client is null. This is weird.");
+                    }
                 } catch (Exception e) {
-                    log.Error(e, "Unhandled exception");
+                    log?.Error(e, "Unhandled exception");
                 }
                 Thread.Sleep(60 * 1000);
             }
         }
 
-        private static async Task doConvertFile(string convertFile) {
+        private static async Task DoConvertFile(string convertFile) {
             var influxWriter = new InfluxLineProtolOutputSink(new Context(Log.Logger, ""));
-            List<PollResult> results = new List<PollResult>( File.ReadAllLines(convertFile).Select( l => PollResult.FromJson(l) ) );
+            var results = new List<PollResult>(File.ReadAllLines(convertFile).Select(l => PollResult.FromJson(l)));
             await influxWriter.NewEvent(results);
         }
     }
