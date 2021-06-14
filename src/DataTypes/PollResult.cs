@@ -8,11 +8,13 @@ namespace PollQT.DataTypes
         public Account Account { get; }
         public AccountBalance Balance { get; }
         public List<AccountPosition> Positions { get; }
-        public PollResult(DateTimeOffset timestamp, Account account, AccountBalance balance, List<AccountPosition> positions) {
+        public List<AccountActivity> Activities { get; }
+        public PollResult(DateTimeOffset timestamp, Account account, AccountBalance balance, List<AccountPosition> positions, List<AccountActivity> activities) {
             Timestamp = timestamp;
             Account = account;
             Balance = balance;
             Positions = positions;
+            Activities = activities;
         }
     }
 }

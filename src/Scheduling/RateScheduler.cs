@@ -1,47 +1,57 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
+using Serilog;
 
 namespace PollQT.Scheduling
 {
     /// <summary>
     /// Allows events through at a rate of numerator / denominator e.g. 30 per second
     /// </summary>
-    class RateScheduler : IScheduler, IDisposable
+    internal class RateScheduler : IScheduler, IDisposable
     {
-        private readonly Timer rateTimer;
-        private readonly ManualResetEvent mreFuture;
-        private readonly Semaphore semaphore;
+        private readonly ILogger log;
+
+        private readonly ManualResetEvent eventFuture;
+        private readonly AutoResetEvent eventRate;
+        private readonly Timer releaseTimer;
+        private readonly TimeSpan oneEvery;
         private bool disposedValue;
 
-        public RateScheduler(int numerator, TimeSpan denominator) {
-            semaphore = new Semaphore(numerator, numerator);
-            rateTimer = new Timer((_) => { 
-                try { 
-                    semaphore.Release(numerator);
-                } catch (SemaphoreFullException) {
-                    
-                }
-
-            }, null, denominator, denominator);
-            mreFuture = new ManualResetEvent(true);
+        public RateScheduler(Context context, int numAllowed, TimeSpan perTimeSpan) {
+            log = context.Logger.ForContext<RateScheduler>();
+            eventRate = new AutoResetEvent(true);
+            eventFuture = new ManualResetEvent(true);
+            oneEvery = perTimeSpan.Divide(numAllowed);
+            releaseTimer = new Timer((_) => {
+                eventRate.Set();
+            }, null, oneEvery, oneEvery);
         }
 
         public void RequestDelayUntil(DateTimeOffset future) {
             if (future > DateTimeOffset.Now) {
-                mreFuture.Reset();
-                var timer = new Timer((_) => mreFuture.Set(), null, DateTimeOffset.Now - future, Timeout.InfiniteTimeSpan);
+                eventFuture.Reset();
+                Task.Delay(future - DateTimeOffset.Now).ContinueWith((_) => eventFuture.Set());
             }
         }
 
-        public void WaitUntilRunnable() => _ = mreFuture.WaitOne() && semaphore.WaitOne();
+        public void WaitUntilRunnable() {
+            var stopwatch = Stopwatch.StartNew();
+            eventFuture.WaitOne();
+            eventRate.WaitOne();
+            stopwatch.Stop();
+            log.Debug("Rate limit delay: {0}ms", stopwatch.ElapsedMilliseconds);
+        }
 
         protected virtual void Dispose(bool disposing) {
             if (!disposedValue) {
                 if (disposing) {
                     // these are backed by Win32 objects
                     // although this is probably unnecessary
-                    rateTimer.Dispose();
-                    semaphore.Dispose();
+                    eventFuture.Dispose();
+                    eventRate.Dispose();
+                    releaseTimer.Dispose();
                 }
                 disposedValue = true;
             }

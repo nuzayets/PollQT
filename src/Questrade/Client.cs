@@ -22,9 +22,8 @@ namespace PollQT.Questrade
         private readonly ITokenStore tokenStore;
         private readonly ILogger log;
 
-        // the API sometimes throws 429 Too Many Requests if you go too fast, so irrespective of any
-        // external scheduling, allow only 1 request per second 
-        private readonly IScheduler minimumRateLimiter = new RateScheduler(1, TimeSpan.FromSeconds(1));
+        // the API sometimes throws 429 Too Many Requests if you go too fast
+        private readonly IScheduler minimumRateLimiter;
 
         private enum RequestType
         {
@@ -32,6 +31,7 @@ namespace PollQT.Questrade
             ACCOUNTS,
             ACCOUNT_BALANCES,
             ACCOUNT_POSITIONS,
+            ACCOUNT_ACTIVITIES,
         }
         public Client(Context context) {
             log = context.Logger.ForContext<Client>();
@@ -45,6 +45,7 @@ namespace PollQT.Questrade
             tokenStore = new FileTokenStore(context);
             log.Information("tokenStore: {tokenStore}", tokenStore);
             NewToken(tokenStore.GetToken(), supressWrite: true);
+            minimumRateLimiter = new RateScheduler(context, 5, TimeSpan.FromSeconds(1)); 
         }
         private string RequestRoute(RequestType requestType, string? id = default) => requestType switch
         {
@@ -53,6 +54,7 @@ namespace PollQT.Questrade
             RequestType.ACCOUNTS => "v1/accounts",
             RequestType.ACCOUNT_BALANCES => $"v1/accounts/{id}/balances",
             RequestType.ACCOUNT_POSITIONS => $"v1/accounts/{id}/positions",
+            RequestType.ACCOUNT_ACTIVITIES => $"v1/accounts/{id}/activities",
             _ => throw new NotImplementedException()
         };
         private string RequestBaseAddress(RequestType requestType) => requestType switch
@@ -61,6 +63,13 @@ namespace PollQT.Questrade
             // if ApiServer isn't set, we need a new token, throw Unauthorized so we relogin
             _ => AuthToken.ApiServer ?? throw new UnauthorizedException()
         };
+
+        private static string RequestQuery(RequestType requestType) => requestType switch
+        {
+            RequestType.ACCOUNT_ACTIVITIES => $"?startTime={DateTimeOffset.Now.AddDays(-7):o}&endTime={DateTimeOffset.Now:o}",
+            _ => ""
+        };
+
         private void NewToken(Token authToken, bool supressWrite = false) {
             AuthToken = authToken;
             HttpClient.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse($"Bearer {authToken.AccessToken}");
@@ -69,26 +78,32 @@ namespace PollQT.Questrade
             }
         }
 
-        private async Task<string> MakeRequest(RequestType type, CancellationToken cancelToken, string? id = default, uint loginRetries = 1) {
+        private async Task<string> MakeRequest(RequestType type, CancellationToken cancelToken, string? id = default, string? queryOverride = default) {
             minimumRateLimiter.WaitUntilRunnable();
 
             var stopwatch = Stopwatch.StartNew();
-            var route = RequestBaseAddress(type) + RequestRoute(type, id);
+            var route = RequestBaseAddress(type) + RequestRoute(type, id) + (queryOverride ?? RequestQuery(type));
             var resp = await HttpClient.GetAsync(route);
             stopwatch.Stop();
             log.Debug("Request: {request}", resp.RequestMessage);
             log.Debug("Response: {resp}", resp);
-            if (!resp.IsSuccessStatusCode) {                
-                if (resp.StatusCode == HttpStatusCode.Unauthorized && loginRetries > 0) {
+            if (!resp.IsSuccessStatusCode) {
+                if (resp.StatusCode == HttpStatusCode.Unauthorized) {
                     // don't invoke any retry logic if we've been cancelled
-                    if (cancelToken.IsCancellationRequested) throw new TaskCanceledException("MakeRequest Unauthorized Handler");
+                    if (cancelToken.IsCancellationRequested) {
+                        throw new TaskCanceledException("MakeRequest Unauthorized Handler");
+                    }
+
                     log.Warning("Unuthorized: {type} ({dur}ms)", type, stopwatch.ElapsedMilliseconds);
                     // We get unauthorized often -- let's not throw an exception, log in here and retry
                     await Login(cancelToken);
                     // Login will throw if it fails so we can retry here worry-free
                     return await MakeRequest(type, cancelToken, id);
                 } else if (resp.StatusCode == HttpStatusCode.TooManyRequests) {
-                    if (cancelToken.IsCancellationRequested) throw new TaskCanceledException("MakeRequest TooManyRequests Handler");
+                    if (cancelToken.IsCancellationRequested) {
+                        throw new TaskCanceledException("MakeRequest TooManyRequests Handler");
+                    }
+
                     try {
                         var nextReset = DateTimeOffset.FromUnixTimeSeconds(long.Parse(resp.Headers.GetValues("X-RateLimit-Reset").First()));
                         minimumRateLimiter.RequestDelayUntil(nextReset);
@@ -101,7 +116,6 @@ namespace PollQT.Questrade
                     log.Error("Error: {type} {resp} ({dur}ms)", type, resp, stopwatch.ElapsedMilliseconds);
                     throw resp.StatusCode switch
                     {
-                        HttpStatusCode.Unauthorized => new UnauthorizedException("Remained unauthorized after retry."),
                         _ => new UnexpectedStatusException(resp),
                     };
                 }
@@ -111,7 +125,10 @@ namespace PollQT.Questrade
             }
         }
         private async Task Login(CancellationToken cancelToken) {
-            if (cancelToken.IsCancellationRequested) throw new TaskCanceledException("Login");
+            if (cancelToken.IsCancellationRequested) {
+                throw new TaskCanceledException("Login");
+            }
+
             log.Information("Logging in with refresh token");
             AuthToken = tokenStore.GetToken(); // get latest refresh in case it changed
             var authToken = await MakeRequest(RequestType.TOKEN, cancelToken);
@@ -120,7 +137,10 @@ namespace PollQT.Questrade
             log.Information("Successfully logged in with refresh token");
         }
         private async Task<T> GetResponse<T>(RequestType type, CancellationToken cancelToken, string? id = default) where T : JsonSerializable<T> {
-            if (cancelToken.IsCancellationRequested) throw new TaskCanceledException("GetResponse");
+            if (cancelToken.IsCancellationRequested) {
+                throw new TaskCanceledException("GetResponse");
+            }
+
             var res = await MakeRequest(type, cancelToken, id);
             log.Verbose("Body: {@res}", res);
             var resObj = JsonSerializable<T>.FromJson(res);
@@ -131,16 +151,39 @@ namespace PollQT.Questrade
             if (AuthToken.ApiServer is null || AuthToken.AccessToken is null) {
                 await Login(cancelToken);
             }
-            var resp = new List<PollResult>();
             var accounts = await GetResponse<AccountsResponse>(RequestType.ACCOUNTS, cancelToken);
             var timestamp = DateTimeOffset.UtcNow;
+            var resp = new List<PollResult>();
             foreach (var account in accounts.Accounts) {
                 var accountBalances = await GetResponse<AccountBalancesResponse>(RequestType.ACCOUNT_BALANCES, cancelToken, account.Number);
                 var accountPositions = await GetResponse<AccountPositionsResponse>(RequestType.ACCOUNT_POSITIONS, cancelToken, account.Number);
-                resp.Add(new PollResult(timestamp, account, accountBalances.CombinedBalances[0], accountPositions.Positions));
+                var accountActivities = await GetResponse<AccountActivitiesResponse>(RequestType.ACCOUNT_ACTIVITIES, cancelToken, account.Number);
+                resp.Add(new PollResult(timestamp, account, accountBalances.CombinedBalances[0], accountPositions.Positions, accountActivities.Activities));
             }
             return resp;
         }
+
+        public async Task<List<(Account account, List<AccountActivity> activities)>> BackfillActivities(CancellationToken cancelToken) {
+            await Login(cancelToken);
+            var accounts = await GetResponse<AccountsResponse>(RequestType.ACCOUNTS, cancelToken);
+            var resp = new List<(Account account, List<AccountActivity>)>();
+            foreach (var account in accounts.Accounts) {
+                var activities = new List<AccountActivity>();
+                var searchStart = new DateTimeOffset(DateTime.Today.Year - 5, 1, 1, 0, 0, 0, 0, TimeSpan.Zero);
+                while (searchStart < DateTimeOffset.Now) {
+                    var searchEnd = searchStart.AddMonths(1).AddDays(-1);
+                    var query = $"?startTime={searchStart:o}&endTime={searchEnd:o}";
+                    var queryRes = await MakeRequest(RequestType.ACCOUNT_ACTIVITIES, cancelToken, account.Number, queryOverride: query);
+                    var resObj = JsonSerializable<AccountActivitiesResponse>.FromJson(queryRes);
+                    activities.AddRange(resObj.Activities);
+                    searchStart = searchStart.AddMonths(1);
+                }
+
+                resp.Add((account, activities));
+            }
+            return resp;
+        }
+
         public async Task<List<PollResult>> PollWithRetry(int maxRetries = 10) {
             var backoff = new ExponentialBackoff(maxRetries, delayMilliseconds: 200, maxDelayMilliseconds: 120000);
         retry:

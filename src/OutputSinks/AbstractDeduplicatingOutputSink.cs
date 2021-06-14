@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using PollQT.DataTypes;
 using Serilog;
@@ -11,7 +10,8 @@ namespace PollQT.OutputSinks
 {
     internal abstract class AbstractDeduplicatingOutputSink : IOutputSink
     {
-        abstract protected ILogger Log { get; }
+        protected abstract ILogger Log { get; }
+
         private readonly ConcurrentDictionary<string, PollResult> prevResults = new();
 
         private bool ShouldWrite(PollResult pollResult) {

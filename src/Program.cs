@@ -24,6 +24,7 @@ namespace PollQT
         /// <param name="fileOutput">True to output JSONL to <c>workDir/out/yyyyMMdd.jsonl</c></param>
         /// <param name="logConsole">True to log to console</param>
         /// <param name="logFile">True to log to file in <c>workDir/log/pollqtyyyyMMdd.log</c></param>
+        /// <param name="backfillActivities">Backfill activities (dump to file) and exit</param>"
         /// <param name="convertFile">Convert a JSONL file to Influx Line Protocol and exit</param>
         private static async Task Main(
             string workDir,
@@ -32,6 +33,7 @@ namespace PollQT
             bool fileOutput = false,
             bool logConsole = false,
             bool logFile = true,
+            bool backfillActivities = false,
             string convertFile = "") {
 
             if (convertFile.Length > 0) {
@@ -74,6 +76,16 @@ namespace PollQT
                 var influxWriter = new InfluxLineProtolOutputSink(context);
                 RaisePollResults += async (s, e) => await influxWriter.NewEvent(e);
             }
+
+            if (backfillActivities) {
+                var activities = await client.BackfillActivities(CancellationToken.None);
+                RaisePollResults?.Invoke(null,
+                    activities.Select(result =>
+                        new PollResult(DateTimeOffset.Now, result.account, new AccountBalance(), new List<AccountPosition>(), result.activities))
+                    .ToList());
+                return;
+            }
+
             await DoPollIndefinitely();
         }
 
