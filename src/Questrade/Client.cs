@@ -221,6 +221,8 @@ namespace PollQT.Questrade
             {
                 var marketsResponse = await GetResponse<MarketsInfo>(RequestType.MARKETS, token);
                 MarketInfo = marketsResponse.Markets.Where(m => m.Name == "TSX").First();
+                MarketInfo.StartTime = MarketInfo.StartTime.AddMinutes(-1);
+                MarketInfo.EndTime = MarketInfo.EndTime.AddMinutes(1);
                 if (MarketInfo.StartTime.Date < DateTimeOffset.Now.Date)
                 {
                     var startTimeToday = DateTimeOffset.Now.Date + (MarketInfo.StartTime - MarketInfo.StartTime.Date);
