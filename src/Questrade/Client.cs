@@ -86,12 +86,7 @@ namespace PollQT.Questrade
         }
 
         private async Task<string> MakeRequest(RequestType type, CancellationToken cancelToken, string? id = default, string? queryOverride = default)
-        {
-            if (AuthToken.ApiServer is null || AuthToken.AccessToken is null)
-            {
-                await Login(cancelToken);
-            }
-            
+        {   
             minimumRateLimiter.WaitUntilRunnable();
 
             var stopwatch = Stopwatch.StartNew();
@@ -177,8 +172,17 @@ namespace PollQT.Questrade
             log.Debug("{resName}: {@res}", resObj.GetType(), resObj);
             return resObj;
         }
+        
+        private async CheckLogin(CancellationToken cancelToken) {
+            if (AuthToken.ApiServer is null || AuthToken.AccessToken is null)
+            {
+                await Login(cancelToken);
+            }   
+        }
+        
         private async Task<List<PollResult>> Poll(CancellationToken cancelToken)
         {
+            await CheckLogin(cancelToken);
             var accounts = await GetResponse<AccountsResponse>(RequestType.ACCOUNTS, cancelToken);
             var timestamp = DateTimeOffset.UtcNow;
             var resp = new List<PollResult>();
@@ -218,6 +222,7 @@ namespace PollQT.Questrade
 
         public async Task<bool> MarketOpenDelay(CancellationToken token)
         {
+            await CheckLogin(cancelToken);
             if (MarketInfo == null || MarketInfo.StartTime.Date < DateTimeOffset.Now.Date)
             {
                 var marketsResponse = await GetResponse<MarketsInfo>(RequestType.MARKETS, token);
