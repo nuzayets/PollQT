@@ -173,7 +173,7 @@ namespace PollQT.Questrade
             return resObj;
         }
         
-        private async void CheckLogin(CancellationToken cancelToken) {
+        private async Task CheckLogin(CancellationToken cancelToken) {
             if (AuthToken.ApiServer is null || AuthToken.AccessToken is null)
             {
                 await Login(cancelToken);
@@ -222,7 +222,7 @@ namespace PollQT.Questrade
 
         public async Task<bool> MarketOpenDelay(CancellationToken token)
         {
-            await CheckLogin(cancelToken);
+            await CheckLogin(token);
             if (MarketInfo == null || MarketInfo.StartTime.Date < DateTimeOffset.Now.Date)
             {
                 var marketsResponse = await GetResponse<MarketsInfo>(RequestType.MARKETS, token);
