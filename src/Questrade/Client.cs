@@ -173,7 +173,7 @@ namespace PollQT.Questrade
             return resObj;
         }
         
-        private async CheckLogin(CancellationToken cancelToken) {
+        private async void CheckLogin(CancellationToken cancelToken) {
             if (AuthToken.ApiServer is null || AuthToken.AccessToken is null)
             {
                 await Login(cancelToken);
